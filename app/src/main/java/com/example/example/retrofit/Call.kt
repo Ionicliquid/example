@@ -1,41 +1,26 @@
 package com.example.example.retrofit
 
-
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Request
-import okhttp3.ResponseBody
-import java.io.IOException
+import okhttp3.Response
 
+interface Call<out T> :Cloneable{
 
-interface Call<T> : Cloneable {
+    fun execute():Response
 
-    fun execute(): Response<T>
+    fun enqueue(callback: Callback)
 
-    fun enqueue(callback: Callback<T>)
-
-    fun isExecuted(): Boolean
+    fun isExecuted():Boolean
 
     fun cancel()
 
-    fun isCanceled(): Boolean
+    fun isCanceled():Boolean
 
-    override fun clone(): Call<T>
+    override fun clone():Call
 
-    fun request(): Request
+    fun request():Request
 
-}
 
-interface Callback<T> {
-    fun onResponse(call: Call<T>)
-    fun onFailure(call: Call<T>, t: Throwable)
-}
 
-interface Converter<F,T>{
-    fun convert(value:F):T
-
-    abstract class Fatory{
-        fun responseBodyConverter():Converter<ResponseBody,*>?{
-            return null
-        }
-        
-    }
 }
