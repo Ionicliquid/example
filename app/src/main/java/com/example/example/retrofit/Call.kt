@@ -3,11 +3,11 @@ package com.example.example.retrofit
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Request
-import okhttp3.Response
 
-interface Call<out T> :Cloneable{
 
-    fun execute():Response
+interface Call<T> :Cloneable{
+
+    fun execute():Response<T>
 
     fun enqueue(callback: Callback)
 
