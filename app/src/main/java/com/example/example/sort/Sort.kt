@@ -99,7 +99,7 @@ class Sort {
         }
 
         private fun merge(left: Array<Int>, right: Array<Int>): Array<Int> {
-            var result = Array(left.size + right.size) { i->i}
+            var result = Array(left.size + right.size) { i -> i }
             var i = 0
             var j = 0
             for (index in result.indices) {
@@ -163,6 +163,43 @@ class Sort {
 
 
         // 计数排序
+        fun coutingSort(array: Array<Int>): Array<Int> {
+            if (array.isEmpty()) {
+                return array
+            }
+            var bias: Int
+            var min = array[0]
+            var max = array[0]
+            for (i in array.indices) {
+                if (array[i] > max) {
+                    max = array[i]
+                }
+                if (array[i] < min) {
+                    min = array[i]
+                }
+            }
+            bias = 0 - min
+            var bucket = Array(max - min + 1, { i -> i })
+            bucket.fill(0)
+            for (i in array.indices) {
+                bucket[array[i] + bias]++
+            }
+            var index = 0
+            var i = 0
+            while (index < array.size) {
+                if (bucket[i] != 0) {
+                    array[index] = i - bias
+                    bucket[i]--
+                    index++
+                } else {
+                    i++
+                }
+
+            }
+            return array
+
+        }
+
         // 桶排序
         // 基数排序
 
@@ -177,7 +214,7 @@ fun main(arg: Array<String>) {
 //    1, 0, 2, 5, 3, 6, 7, 9, 8, 10
 //    0, 1, 2, 3, 5, 6, 7, 8, 9, 10,
 
-    for (item in Sort.mergeSort(array)) {
+    for (item in Sort.coutingSort(array)) {
         System.out.print("$item ,")
     }
 
