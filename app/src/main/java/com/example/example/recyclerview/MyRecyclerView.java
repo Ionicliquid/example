@@ -19,7 +19,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 
 public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, ScrollingView {
@@ -30,7 +29,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
     public static final int HORIZONTAL = LinearLayout.HORIZONTAL;
     public static final int VERTICAL = LinearLayout.VERTICAL;
     static final int DEAFAULT_ORIENTATION = VERTICAL;
-
     @IntDef({HORIZONTAL, VERTICAL})
     @Retention(RetentionPolicy.SOURCE)
     public @interface Orientation {

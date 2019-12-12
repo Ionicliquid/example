@@ -1,6 +1,8 @@
 package com.example.example.hashmap;
 
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -10,10 +12,15 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
 
 
     static final int DEFAULT_INITIAL_CAPACITY = 1 << 4;
+
     static final int MAXIMUM_CAPACITY = 1 << 30;//
+
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
+
     static final int TREEIFY_THRESHOLD = 8;
+
     static final int UNTREEIFY_THRESHOLD = 6;
+
     static final int MIN_TREEIFY_CAPACITY = 64;
 
     transient Node<K, V>[] table;
@@ -45,9 +52,21 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
             if (p.hash == hash && ((k = p.key) == key || (key != null && key.equals(k)))) {
                 e = p;
             } else if (p instanceof TreeNode) {
-
+                e = ((TreeNode<K, V>) p).putTreeVal(this, tab, hash, key, value);
             } else {
-
+                for (int binCount = 0; ; ++binCount) {
+                    if ((e = p.next) == null) {
+                        p.next = newNode(hash, key, value, null);
+                        if (binCount >= TREEIFY_THRESHOLD - 1) {
+                            treeifyBin(tab, hash);
+                        }
+                        break;
+                    }
+                    if (e.hash == hash && ((k = e.key) == key && (key != null && key.equals(k)))) {
+                        break;
+                    }
+                    p = e;
+                }
             }
             if (e != null) {
                 V oldValue = e.value;
@@ -65,6 +84,36 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
         }
         afterNodeInsertion(evict);
         return null;
+    }
+
+    final void treeifyBin(Node<K, V>[] tab, int hash) {
+
+        int n, index;
+        Node<K, V> e;
+        if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY) {
+            resize();
+        } else if ((e = table[index = (n - 1) & hash]) != null) {
+            TreeNode<K, V> hd = null, tl = null;
+            do {
+                TreeNode<K, V> p = replacementTreeNode(e, null);
+                if (tl == null) {
+                    hd = p;
+                } else {
+                    p.prev = tl;
+                    tl.next = p;
+                }
+                tl = p;
+            } while ((e = e.next) != null);
+            if ((tab[index] = hd) != null) {
+                hd.treeify(tab);
+            }
+        }
+
+
+    }
+
+    private TreeNode<K, V> replacementTreeNode(Node<K, V> p, Node<K, V> o) {
+        return new TreeNode<>(p.hash, p.key, p.value, o);
     }
 
     private void afterNodeInsertion(boolean evict) {
@@ -309,6 +358,43 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
         }
 
         private void treeify(Node<K, V>[] tab) {
+            TreeNode<K, V> root = null;
+            for (TreeNode<K, V> x = this, next; x != null; x = next) {
+                next = (TreeNode<K, V>) x.next;
+                x.left = x.right = null;
+                if (root == null) {
+                    x.parent = null;
+                    x.red = false;
+                    root = x;
+                } else {
+                    K k = x.key;
+                    int h = x.hash;
+                    Class<?> kc = null;
+                    for (TreeNode<K, V> p = root; ; ) {
+                        int dir = 0;
+                        int ph;
+                        if ((ph = p.hash) > h) {
+                            dir = -1;
+                        } else if (ph < h) {
+                            dir = 1;
+                        }
+                        TreeNode<K, V> xp = p;
+                        if ((p = (dir <= 0) ? p.left : p.right) == null) {
+                            x.parent = xp;
+                            if (dir <= 0) {
+                                xp.left = x;
+                            } else {
+                                xp.right = x;
+                            }
+                            root = balanceInsertion(root, x);
+                            break;
+                        }
+                    }
+                    moveRootToFront(tab, root);
+                }
+            }
+
+
         }
 
         final Node<K, V> untreeify(MyHashMap<K, V> map) {
@@ -368,9 +454,15 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
                     p = pr;
                 } else if (pr == null) {
                     return pl;
-                } else if ()
-
-
+                } else if ((kc != null
+                        || (kc = comparableClassFor(k)) != null)
+                        && (dir = comparaComparables(kc, k, pk)) != 0) {
+                    p = (dir < 0) ? pl : pr;
+                } else if ((q = pr.find(h, k, kc)) != null) {
+                    return q;
+                } else {
+                    p = pl;
+                }
             } while (p != null);
             return null;
         }
@@ -405,9 +497,7 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
                         ((TreeNode<K, V>) xpn).prev = xp;
                     }
                     moveRootToFront(tab, balanceInsertion(root, x));
-
                 }
-
             }
         }
 
@@ -544,5 +634,33 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
 
     }
 
+    static Class<?> comparableClassFor(Object x) {
+        if (x instanceof Comparable) {
+            Class<?> c;
+            Type[] ts;
+            Type[] as;
+            Type t;
+            ParameterizedType p;
+            if ((c = x.getClass()) == String.class) {
+                return c;
+            }
+            if ((ts = c.getGenericInterfaces()) != null) {
+                for (int i = 0; i < ts.length; ++i) {
+                    if (((t = ts[i]) instanceof ParameterizedType)
+                            && ((p = (ParameterizedType) t).getRawType() == Comparable.class)
+                            && (as = p.getActualTypeArguments()) != null
+                            && as.length == 1 && as[0] == c) {
+                        return c;
+                    }
+                }
+            }
+
+        }
+        return null;
+    }
+
+    static int comparaComparables(Class<?> kc, Object k, Object x) {
+        return (x == null || x.getClass() != kc) ? 0 : ((Comparable) k).compareTo(x);
+    }
 
 }
