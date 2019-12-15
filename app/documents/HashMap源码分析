@@ -1,3 +1,22 @@
+
+## 简介
+
+## 扩容
+当HashMap的大小超过了负载因子（load factor）定义的容量（默认的负载因子是0.75），将会创建原来hashMap大小的两倍的bucket数组，来重新调整Map的大小。
+这里会出现2个常见的面试题：    
+1. hashMap中计算Key的hash值的方法
+```java
+static final int hash(Object key) {
+        int h;
+        return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+    }
+```
+2. hashMap中计算key对应数组索引的方法：`index = **hash&(array.length-1)`，**
+### 线程不安全
+## 为什么多线程会导致死循环，它是怎么发生的？
+## HashMap中的红黑树分析
+
+
 1. JDK 在1.8中引入红黑树，这样底层数据结构由`数组+链表` 变成`数组+链表+红黑数`。
 2. 红黑树是一种平衡的二叉查找树，是一种高效的查找树。
 > 二叉树存储原理：设 x 是二叉搜索树中的一个节点。如果y是x左子树中的一个节点，那么y.key<=x.key。如果 y 是 x 右子树中的一个节点，那么y.key>=x.key。

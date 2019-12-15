@@ -1,11 +1,15 @@
 package com.example.example.recyclerview;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.LinearLayout;
+
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -13,6 +17,7 @@ import androidx.annotation.VisibleForTesting;
 import androidx.core.view.NestedScrollingChild2;
 import androidx.core.view.ScrollingView;
 import androidx.core.view.ViewCompat;
+import androidx.recyclerview.widget.RecyclerView;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -28,33 +33,179 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
     public static final int HORIZONTAL = LinearLayout.HORIZONTAL;
     public static final int VERTICAL = LinearLayout.VERTICAL;
-    static final int DEAFAULT_ORIENTATION = VERTICAL;
-    @IntDef({HORIZONTAL, VERTICAL})
-    @Retention(RetentionPolicy.SOURCE)
-    public @interface Orientation {
-
-    }
-    //</editor-fold>
-
     public static final int NO_POSITION = -1;
     public static final long NO_ID = -1;
+    //</editor-fold>
     public static final int INVALID_TYPE = -1;
-
+    static final int DEAFAULT_ORIENTATION = VERTICAL;
+    AdapterHelper mAdapterHelper;
+    ChildHelper mChildHelper;
+    private int mTouchSlop;
+    public static final boolean DEBUG = false;
 
     public MyRecyclerView(Context context) {
-        super(context);
+        this(context, null);
     }
 
     public MyRecyclerView(Context context, AttributeSet attrs) {
-        super(context, attrs);
+        this(context, attrs, 0);
     }
 
     public MyRecyclerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        setScrollContainer(true);
+        setFocusableInTouchMode(true);
+        final ViewConfiguration vc = ViewConfiguration.get(context);
+        mTouchSlop = vc.getScaledTouchSlop();
+        initAdapterManager();
+        initChildHelper();
+
+    }
+
+    private void initAdapterManager() {
+        mAdapterHelper = new AdapterHelper(new AdapterHelper.Callback() {
+            @Override
+            public ViewHolder findViewHolder(int positon) {
+                return null;
+            }
+
+            @Override
+            public void offsetPositionForRemovingInvisible(int positionStart, int itemCount) {
+
+            }
+
+            @Override
+            public void offsetPositionForRemovingLaidOutNewView(int positionStart, int itemCount) {
+
+            }
+
+            @Override
+            public void markViewHolderUpdated(int positonStart, int itemCount, Object payloads) {
+
+            }
+
+            @Override
+            public void onDispatchFirstPass(AdapterHelper.UpdateOp updateOp) {
+
+            }
+
+            @Override
+            public void onDispatchSecondPass(AdapterHelper.UpdateOp updateOp) {
+
+            }
+
+            @Override
+            public void offsetPostionForAdd(int positionStart, int itemCount) {
+
+            }
+
+            @Override
+            public void offsetPostionForMove(int from, int to) {
+
+            }
+        });
+    }
+
+    private void initChildHelper() {
+        mChildHelper = new ChildHelper(new ChildHelper.Callback() {
+            @Override
+            public int getChildCount() {
+                return MyRecyclerView.this.getChildCount();
+            }
+
+            @Override
+            public void addView(View child, int index) {
+                MyRecyclerView.this.addView(child, index);
+            }
+
+            @Override
+            public int indexOfChild(View view) {
+
+            }
+
+            @Override
+            public void removeView(int index) {
+
+            }
+
+            @Override
+            public void removeViewAt(int index) {
+
+            }
+
+            @Override
+            public View getChildAt(int offset) {
+                return null;
+            }
+
+            @Override
+            public void removeAllViews() {
+
+            }
+
+            @Override
+            public ViewHolder getChildViewHolder(View view) {
+                return null;
+            }
+
+            @Override
+            public void detachViewFromParent(int offset) {
+
+            }
+
+            @Override
+            public void onEnteredHiddenState(View child) {
+
+            }
+
+            @Override
+            public void onLeftHiddenState(View child) {
+
+            }
+
+            @Override
+            public void attachViewToParent(View child, int index, LayoutParams layoutParams) {
+
+            }
+        });
     }
 
     public MyRecyclerView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+    }
+
+    static void clearNestedRecyclerViewIfNotNested(@NonNull ViewHolder holder) {
+        if (holder.mNestedRecyclerView != null) {
+            View item = holder.mNestedRecyclerView.get();
+            while (item != null) {
+                if (item == holder.itemView) {
+                    return;
+                }
+                ViewParent parent = item.getParent();
+                if (parent instanceof View) {
+                    item = (View) parent;
+                } else {
+                    item = null;
+                }
+            }
+            holder.mNestedRecyclerView = null;
+        }
+    }
+
+    ViewHolder findViewHolderForPosition(int position, boolean checkNewPositon) {
+        final int childCount = mChildHelper.getUnfilteredChildCount();
+        ViewHolder hidden = null;
+        for (int i = 0; i < childCount; i++) {
+            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
+        }
+    }
+
+    static ViewHolder getChildViewHolderInt(View child) {
+        if (child == null) {
+            return null;
+        }
+
+
     }
 
     @Override
@@ -117,39 +268,24 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
         return false;
     }
 
-    static void clearNestedRecyclerViewIfNotNested(@NonNull ViewHolder holder) {
-        if (holder.mNestedRecyclerView != null) {
-            View item = holder.mNestedRecyclerView.get();
-            while (item != null) {
-                if (item == holder.itemView) {
-                    return;
-                }
-                ViewParent parent = item.getParent();
-                if (parent instanceof View) {
-                    item = (View) parent;
-                } else {
-                    item = null;
-                }
-            }
-            holder.mNestedRecyclerView = null;
+    private String getClassName(Context context, String className) {
+        if (className.charAt(0) == '.') {
+            return context.getPackageName() + className;
         }
+        if (className.contains(".")) {
+            return className;
+        }
+        return MyRecyclerView.class.getPackage().getName() + "." + className;
+
+    }
+
+    @IntDef({HORIZONTAL, VERTICAL})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface Orientation {
+
     }
 
     public abstract static class ViewHolder {
-
-        @NonNull
-        public final View itemView;
-
-        WeakReference<MyRecyclerView> mNestedRecyclerView;
-
-        int mPosition = NO_POSITION;
-        int mOldPosition = NO_POSITION;
-        long mItemId = NO_ID;
-        int mItemViewType = INVALID_TYPE;
-        int mPreLayoutPosition = NO_POSITION;
-
-        ViewHolder mShadowedHolder = null;
-        ViewHolder mShadowingHolder = null;
 
         static final int FLAG_BOUND = 1 << 0;
         static final int FLAG_UPDATE = 1 << 1;
@@ -163,27 +299,29 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
         static final int FLAG_ADAPTER_FULLUPDATE = 1 << 10;
         static final int FLAG_MOVED = 1 << 11;
         static final int FLAG_APPEARED_IN_PRE_LAYOUT = 1 << 12;
-
         static final int PENDING_ACCESSIBILITY_STATE_NOT_SET = -1;
         static final int FLAG_BOUNCED_FROM_HIDDEN_LIST = 1 << 13;
         static final int FLAG_SET_A11Y_ITEM_DELEGATE = 1 << 14;
-
-        int mFlags;
-
         private static final List<Object> FULLUPDATE_PAYLOADS = Collections.emptyList();
-
+        @NonNull
+        public final View itemView;
+        WeakReference<MyRecyclerView> mNestedRecyclerView;
+        int mPosition = NO_POSITION;
+        int mOldPosition = NO_POSITION;
+        long mItemId = NO_ID;
+        int mItemViewType = INVALID_TYPE;
+        int mPreLayoutPosition = NO_POSITION;
+        ViewHolder mShadowedHolder = null;
+        ViewHolder mShadowingHolder = null;
+        int mFlags;
         List<Object> mPayloads = null;
         List<Object> mUnmodifiedPayloads = null;
-
-        private int mIsRecyclableCount = 0;
-
-        private int mWasImportantForAccessibilityBeforeHidden =
-                ViewCompat.IMPORTANT_FOR_ACCESSIBILITY_AUTO;
-
         MyRecyclerView mOwnerRecyclerView;
-
         @VisibleForTesting
         int mPendingAccessibilityState = PENDING_ACCESSIBILITY_STATE_NOT_SET;
+        private int mIsRecyclableCount = 0;
+        private int mWasImportantForAccessibilityBeforeHidden =
+                ViewCompat.IMPORTANT_FOR_ACCESSIBILITY_AUTO;
 
 
         public ViewHolder(@NonNull View itemView) {
@@ -193,30 +331,322 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             this.itemView = itemView;
         }
 
+        void flagRemovedAndOffsetPosition(int mNewPosition, int offset, boolean applyToPreLayout) {
+            addFlags(ViewHolder.FLAG_REMOVED);
+            offsetPosition(offset, applyToPreLayout);
+            mPosition = mNewPosition;
+        }
 
+        void offsetPosition(int offset, boolean applyToPreLayout) {
+            if (mOldPosition == NO_POSITION) {
+                mOldPosition = mPosition;
+            }
+            if (mPreLayoutPosition == NO_POSITION) {
+                mPreLayoutPosition = mPosition;
+            }
+            if (applyToPreLayout) {
+                mPreLayoutPosition += offset;
+            }
+            mPosition += offset;
+            if (itemView.getLayoutParams() != null) {
+                ((LayoutParams) itemView.getLayoutParams()).mInsetsDirty = true;
+            }
+        }
+
+        void clearOldPosition() {
+            mOldPosition = NO_POSITION;
+            mPreLayoutPosition = NO_POSITION;
+        }
+
+        void saveOldPosition() {
+            if (mOldPosition == NO_POSITION) {
+                mOldPosition = mPosition;
+            }
+        }
+
+        boolean shouldIgnore() {
+            return (mFlags & FLAG_IGNORE) != 0;
+        }
+
+        public final int getLayoutPosition() {
+            return mPreLayoutPosition == NO_POSITION ? mPosition : mPreLayoutPosition;
+        }
+
+        public final int getAdapterPosition() {
+            if (mOwnerRecyclerView == null) {
+                return NO_POSITION;
+            }
+            return mOwnerRecyclerView.getAdapterPositionFor(this);
+        }
+
+        public final int getOldPosition() {
+            return mOldPosition;
+        }
+
+        public final long getItemId() {
+            return mItemId;
+        }
+
+        public final int getItemViewType() {
+            return mItemViewType;
+        }
+
+        boolean isScrap() {
+            return mScrapContainer != null;
+        }
+
+        void unScrap() {
+            mScrapContainer.unscrapView(this);
+        }
+
+        boolean wasReturnedFromScrap() {
+            return (mFlags & FLAG_RETURNED_FROM_SCRAP) != 0;
+        }
+
+        void clearReturnedFromScrapFlag() {
+            mFlags = mFlags & ~FLAG_RETURNED_FROM_SCRAP;
+        }
+
+        void clearTmpDetachFlag() {
+            mFlags = mFlags & ~FLAG_TMP_DETACHED;
+        }
+
+        void stopIgnoring() {
+            mFlags = mFlags & ~FLAG_IGNORE;
+        }
+
+        void setScrapContainer(Recycler recycler, boolean isChangeScrap) {
+            mScrapContainer = recycler;
+            mInChangeScrap = isChangeScrap;
+        }
+
+        boolean isInvalid() {
+            return (mFlags & FLAG_INVALID) != 0;
+        }
+
+        boolean needsUpdate() {
+            return (mFlags & FLAG_UPDATE) != 0;
+        }
+
+        boolean isBound() {
+            return (mFlags & FLAG_BOUND) != 0;
+        }
+
+        boolean isRemoved() {
+            return (mFlags & FLAG_REMOVED) != 0;
+        }
+
+        boolean hasAnyOfTheFlags(int flags) {
+            return (mFlags & flags) != 0;
+        }
+
+        boolean isTmpDetached() {
+            return (mFlags & FLAG_TMP_DETACHED) != 0;
+        }
+
+        boolean isAdapterPositionUnknown() {
+            return (mFlags & FLAG_ADAPTER_POSITION_UNKNOWN) != 0 || isInvalid();
+        }
+
+        void setFlags(int flags, int mask) {
+            mFlags = (mFlags & ~mask) | (flags & mask);
+        }
+
+        void addFlags(int flags) {
+            mFlags |= flags;
+        }
+
+        void addChangePayload(Object payload) {
+            if (payload == null) {
+                addFlags(FLAG_ADAPTER_FULLUPDATE);
+            } else if ((mFlags & FLAG_ADAPTER_FULLUPDATE) == 0) {
+                createPayloadsIfNeeded();
+                mPayloads.add(payload);
+            }
+        }
+
+        private void createPayloadsIfNeeded() {
+            if (mPayloads == null) {
+                mPayloads = new ArrayList<Object>();
+                mUnmodifiedPayloads = Collections.unmodifiableList(mPayloads);
+            }
+        }
+
+        void clearPayload() {
+            if (mPayloads != null) {
+                mPayloads.clear();
+            }
+            mFlags = mFlags & ~FLAG_ADAPTER_FULLUPDATE;
+        }
+
+        List<Object> getUnmodifiedPayloads() {
+            if ((mFlags & FLAG_ADAPTER_FULLUPDATE) == 0) {
+                if (mPayloads == null || mPayloads.size() == 0) {
+                    // Initial state,  no update being called.
+                    return FULLUPDATE_PAYLOADS;
+                }
+                // there are none-null payloads
+                return mUnmodifiedPayloads;
+            } else {
+                // a full update has been called.
+                return FULLUPDATE_PAYLOADS;
+            }
+        }
+
+        void resetInternal() {
+            mFlags = 0;
+            mPosition = NO_POSITION;
+            mOldPosition = NO_POSITION;
+            mItemId = NO_ID;
+            mPreLayoutPosition = NO_POSITION;
+            mIsRecyclableCount = 0;
+            mShadowedHolder = null;
+            mShadowingHolder = null;
+            clearPayload();
+            mWasImportantForAccessibilityBeforeHidden = ViewCompat.IMPORTANT_FOR_ACCESSIBILITY_AUTO;
+            mPendingAccessibilityState = PENDING_ACCESSIBILITY_STATE_NOT_SET;
+            clearNestedRecyclerViewIfNotNested(this);
+        }
+
+        void onEnteredHiddenState(MyRecyclerView parent) {
+            // While the view item is in hidden state, make it invisible for the accessibility.
+            if (mPendingAccessibilityState != PENDING_ACCESSIBILITY_STATE_NOT_SET) {
+                mWasImportantForAccessibilityBeforeHidden = mPendingAccessibilityState;
+            } else {
+                mWasImportantForAccessibilityBeforeHidden =
+                        ViewCompat.getImportantForAccessibility(itemView);
+            }
+            parent.setChildImportantForAccessibilityInternal(this,
+                    ViewCompat.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        }
+
+        void onLeftHiddenState(MyRecyclerView parent) {
+            parent.setChildImportantForAccessibilityInternal(this,
+                    mWasImportantForAccessibilityBeforeHidden);
+            mWasImportantForAccessibilityBeforeHidden = ViewCompat.IMPORTANT_FOR_ACCESSIBILITY_AUTO;
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("ViewHolder{"
+                    + Integer.toHexString(hashCode()) + " position=" + mPosition + " id=" + mItemId
+                    + ", oldPos=" + mOldPosition + ", pLpos:" + mPreLayoutPosition);
+            if (isScrap()) {
+                sb.append(" scrap ")
+                        .append(mInChangeScrap ? "[changeScrap]" : "[attachedScrap]");
+            }
+            if (isInvalid()) sb.append(" invalid");
+            if (!isBound()) sb.append(" unbound");
+            if (needsUpdate()) sb.append(" update");
+            if (isRemoved()) sb.append(" removed");
+            if (shouldIgnore()) sb.append(" ignored");
+            if (isTmpDetached()) sb.append(" tmpDetached");
+            if (!isRecyclable()) sb.append(" not recyclable(" + mIsRecyclableCount + ")");
+            if (isAdapterPositionUnknown()) sb.append(" undefined adapter position");
+
+            if (itemView.getParent() == null) sb.append(" no parent");
+            sb.append("}");
+            return sb.toString();
+        }
+
+        public final void setIsRecyclable(boolean recyclable) {
+            mIsRecyclableCount = recyclable ? mIsRecyclableCount - 1 : mIsRecyclableCount + 1;
+            if (mIsRecyclableCount < 0) {
+                mIsRecyclableCount = 0;
+                if (DEBUG) {
+                    throw new RuntimeException("isRecyclable decremented below 0: "
+                            + "unmatched pair of setIsRecyable() calls for " + this);
+                }
+                Log.e(VIEW_LOG_TAG, "isRecyclable decremented below 0: "
+                        + "unmatched pair of setIsRecyable() calls for " + this);
+            } else if (!recyclable && mIsRecyclableCount == 1) {
+                mFlags |= FLAG_NOT_RECYCLABLE;
+            } else if (recyclable && mIsRecyclableCount == 0) {
+                mFlags &= ~FLAG_NOT_RECYCLABLE;
+            }
+            if (DEBUG) {
+                Log.d(TAG, "setIsRecyclable val:" + recyclable + ":" + this);
+            }
+        }
+        public final boolean isRecyclable() {
+            return (mFlags & FLAG_NOT_RECYCLABLE) == 0
+                    && !ViewCompat.hasTransientState(itemView);
+        }
+
+
+        boolean shouldBeKeptAsChild() {
+            return (mFlags & FLAG_NOT_RECYCLABLE) != 0;
+        }
+
+        boolean doesTransientStatePreventRecycling() {
+            return (mFlags & FLAG_NOT_RECYCLABLE) == 0 && ViewCompat.hasTransientState(itemView);
+        }
+
+        boolean isUpdated() {
+            return (mFlags & FLAG_UPDATE) != 0;
+        }
     }
 
     public abstract static class ItemDecoration {
 
     }
 
+    public static class RecycledViewPool {
+
+    }
+
+    public abstract static class ViewCacheExtension {
+
+        public abstract View getViewForPositionAndType(@NonNull Recycler recycler, int position, int type);
+    }
+
+    public static class LayoutParams extends MarginLayoutParams {
+
+        final Rect mDecorInsets = new Rect();
+        ViewHolder mViewHolder;
+        boolean mInsetsDirty = true;
+        boolean mPendingInvalidate = false;
+
+
+        public LayoutParams(Context c, AttributeSet attrs) {
+            super(c, attrs);
+        }
+
+        public LayoutParams(int width, int height) {
+            super(width, height);
+        }
+
+        public LayoutParams(MarginLayoutParams source) {
+            super(source);
+        }
+
+        public LayoutParams(ViewGroup.LayoutParams source) {
+            super(source);
+        }
+
+        public boolean viewNeedsUpdate() {
+
+            return mViewHolder.needsUpdate();
+        }
+
+        public boolean isViewInvalid() {
+            return mViewHolder.isInvalid();
+        }
+    }
+
     public final class Recycler {
+        static final int DEFAULT_CACHE_SIZE = 2;
         final ArrayList<ViewHolder> mAttachedScrap = new ArrayList<>();
-
-        ArrayList<ViewHolder> mChangedScrap = null;
-
         final ArrayList<ViewHolder> mCachedViews = new ArrayList<>();
 
         private final List<ViewHolder> mUnmodifiableAttachedScrap = Collections.unmodifiableList(mAttachedScrap);
-
-        private int mRequestCacheMax = DEFAULT_CACHE_SIZE;
+        ArrayList<ViewHolder> mChangedScrap = null;
         int mViewCacheMax = DEFAULT_CACHE_SIZE;
 
 
         RecycledViewPool mRecyclerPool;
+        private int mRequestCacheMax = DEFAULT_CACHE_SIZE;
         private ViewCacheExtension mViewCacheExtension;
-
-        static final int DEFAULT_CACHE_SIZE = 2;
 
         public void clear() {
             mAttachedScrap.clear();
@@ -242,17 +672,5 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             clearNestedRecyclerViewIfNotNested(viewHolder);
 
         }
-
-
-    }
-
-    public static class RecycledViewPool {
-
-    }
-
-
-    public abstract static class ViewCacheExtension {
-
-        public abstract View getViewForPositionAndType(@NonNull Recycler recycler, int position, int type);
     }
 }

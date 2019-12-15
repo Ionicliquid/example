@@ -23,6 +23,8 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
 
     static final int MIN_TREEIFY_CAPACITY = 64;
 
+    final float loadFactor = 0;
+
     transient Node<K, V>[] table;
 
     transient Set<Map.Entry<K, V>> entrySet;
@@ -33,8 +35,45 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
 
     int threshold;
 
-    final float loadFactor = 0;
+    /**
+     * 获取hash值
+     *
+     * @param key
+     * @return
+     */
+    static final int hash(Object key) {
+        int h;
+        return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+    }
 
+    static Class<?> comparableClassFor(Object x) {
+        if (x instanceof Comparable) {
+            Class<?> c;
+            Type[] ts;
+            Type[] as;
+            Type t;
+            ParameterizedType p;
+            if ((c = x.getClass()) == String.class) {
+                return c;
+            }
+            if ((ts = c.getGenericInterfaces()) != null) {
+                for (int i = 0; i < ts.length; ++i) {
+                    if (((t = ts[i]) instanceof ParameterizedType)
+                            && ((p = (ParameterizedType) t).getRawType() == Comparable.class)
+                            && (as = p.getActualTypeArguments()) != null
+                            && as.length == 1 && as[0] == c) {
+                        return c;
+                    }
+                }
+            }
+
+        }
+        return null;
+    }
+
+    static int comparaComparables(Class<?> kc, Object k, Object x) {
+        return (x == null || x.getClass() != kc) ? 0 : ((Comparable) k).compareTo(x);
+    }
 
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent, boolean evict) {
         Node<K, V>[] tab;
@@ -86,47 +125,6 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
         return null;
     }
 
-    final void treeifyBin(Node<K, V>[] tab, int hash) {
-
-        int n, index;
-        Node<K, V> e;
-        if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY) {
-            resize();
-        } else if ((e = table[index = (n - 1) & hash]) != null) {
-            TreeNode<K, V> hd = null, tl = null;
-            do {
-                TreeNode<K, V> p = replacementTreeNode(e, null);
-                if (tl == null) {
-                    hd = p;
-                } else {
-                    p.prev = tl;
-                    tl.next = p;
-                }
-                tl = p;
-            } while ((e = e.next) != null);
-            if ((tab[index] = hd) != null) {
-                hd.treeify(tab);
-            }
-        }
-
-
-    }
-
-    private TreeNode<K, V> replacementTreeNode(Node<K, V> p, Node<K, V> o) {
-        return new TreeNode<>(p.hash, p.key, p.value, o);
-    }
-
-    private void afterNodeInsertion(boolean evict) {
-    }
-
-    private void afterNodeAccess(Node<K, V> e) {
-    }
-
-    private Node<K, V> newNode(int hash, K key, V value, Node<K, V> next) {
-        return new Node<>(hash, key, value, next);
-
-    }
-
     final Node<K, V>[] resize() {
         Node<K, V>[] oldTab = table;
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
@@ -166,6 +164,47 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
         }
 
         return newTab;
+    }
+
+    private Node<K, V> newNode(int hash, K key, V value, Node<K, V> next) {
+        return new Node<>(hash, key, value, next);
+
+    }
+
+    final void treeifyBin(Node<K, V>[] tab, int hash) {
+
+        int n, index;
+        Node<K, V> e;
+        if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY) {
+            resize();
+        } else if ((e = table[index = (n - 1) & hash]) != null) {
+            TreeNode<K, V> hd = null, tl = null;
+            do {
+                TreeNode<K, V> p = replacementTreeNode(e, null);
+                if (tl == null) {
+                    hd = p;
+                } else {
+                    p.prev = tl;
+                    tl.next = p;
+                }
+                tl = p;
+            } while ((e = e.next) != null);
+            if ((tab[index] = hd) != null) {
+                hd.treeify(tab);
+            }
+        }
+
+
+    }
+
+    private void afterNodeAccess(Node<K, V> e) {
+    }
+
+    private void afterNodeInsertion(boolean evict) {
+    }
+
+    private TreeNode<K, V> replacementTreeNode(Node<K, V> p, Node<K, V> o) {
+        return new TreeNode<>(p.hash, p.key, p.value, o);
     }
 
     @Override
@@ -228,6 +267,16 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
         return null;
     }
 
+    private TreeNode<K, V> newTreeNode(int h, K k, V v, Node<K, V> xpn) {
+
+        return new TreeNode<>(h, k, v, xpn);
+    }
+
+    private Node<K, V> replacementNode(Node<K, V> q, Node<K, V> next) {
+
+        return new Node<K, V>(q.hash, q.key, q.value, next);
+
+    }
 
     static class Node<K, V> implements Map.Entry<K, V> {
 
@@ -261,6 +310,11 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
         }
 
         @Override
+        public int hashCode() {
+            return Objects.hashCode(key) ^ Objects.hashCode(value);
+        }
+
+        @Override
         public boolean equals(Object obj) {
             if (obj == this) {
                 return true;
@@ -273,11 +327,6 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
                 }
             }
             return false;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hashCode(key) ^ Objects.hashCode(value);
         }
 
         @Override
@@ -296,124 +345,6 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
         public TreeNode(int hash, K key, V value, Node<K, V> next) {
             super(hash, key, value, next);
         }
-
-        final TreeNode<K, V> root() {
-            for (TreeNode<K, V> r = this, p; ; ) {
-                if ((p = r.parent) == null) {
-                    return r;
-                }
-                r = p;
-            }
-        }
-
-        final void split(MyHashMap<K, V> map, Node<K, V>[] tab, int index, int bit) {
-            TreeNode<K, V> b = this;
-            TreeNode<K, V> loHead = null;
-            TreeNode<K, V> lotail = null;
-            TreeNode<K, V> hiHead = null;
-            TreeNode<K, V> hiTail = null;
-            int lc = 0;
-            int hc = 0;
-            for (TreeNode<K, V> e = b, next; e != null; e = next) {
-                next = (TreeNode<K, V>) e.next;
-                e.next = null;
-                if ((e.hash & bit) == 0) {
-                    if ((e.prev = lotail) == null) {
-                        loHead = e;
-                    } else {
-                        lotail.next = e;
-                    }
-                    lotail = e;
-                    ++lc;
-                } else {
-                    if ((e.prev = hiTail) == null) {
-                        hiHead = e;
-                    } else {
-                        hiTail.next = e;
-                    }
-                    hiTail = e;
-                    ++hc;
-                }
-                if (loHead != null) {
-                    if (lc <= UNTREEIFY_THRESHOLD) {
-                        tab[index] = loHead.untreeify(map);
-                    } else {
-                        tab[index] = loHead;
-                        if (hiHead != null) {
-                            loHead.treeify(tab);
-                        }
-                    }
-                }
-                if (hiHead != null) {
-                    if (hc <= UNTREEIFY_THRESHOLD) {
-                        tab[index + bit] = hiHead.untreeify(map);
-                    } else {
-                        tab[index + bit] = hiHead;
-                        if (loHead != null) {
-                            hiHead.treeify(tab);
-                        }
-                    }
-                }
-            }
-        }
-
-        private void treeify(Node<K, V>[] tab) {
-            TreeNode<K, V> root = null;
-            for (TreeNode<K, V> x = this, next; x != null; x = next) {
-                next = (TreeNode<K, V>) x.next;
-                x.left = x.right = null;
-                if (root == null) {
-                    x.parent = null;
-                    x.red = false;
-                    root = x;
-                } else {
-                    K k = x.key;
-                    int h = x.hash;
-                    Class<?> kc = null;
-                    for (TreeNode<K, V> p = root; ; ) {
-                        int dir = 0;
-                        int ph;
-                        if ((ph = p.hash) > h) {
-                            dir = -1;
-                        } else if (ph < h) {
-                            dir = 1;
-                        }
-                        TreeNode<K, V> xp = p;
-                        if ((p = (dir <= 0) ? p.left : p.right) == null) {
-                            x.parent = xp;
-                            if (dir <= 0) {
-                                xp.left = x;
-                            } else {
-                                xp.right = x;
-                            }
-                            root = balanceInsertion(root, x);
-                            break;
-                        }
-                    }
-                    moveRootToFront(tab, root);
-                }
-            }
-
-
-        }
-
-        final Node<K, V> untreeify(MyHashMap<K, V> map) {
-
-            Node<K, V> hd = null;
-            Node<K, V> tl = null;
-            for (Node<K, V> q = this; q != null; q = q.next) {
-                Node<K, V> p = map.replacementNode(q, null);
-                if (tl == null) {
-                    hd = p;
-                } else {
-                    tl.next = p;
-                }
-                tl = p;
-            }
-            return hd;
-
-        }
-
 
         static <K, V> TreeNode<K, V> rotateRight(TreeNode<K, V> root, TreeNode<K, V> p) {
             TreeNode<K, V> l;
@@ -434,71 +365,6 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
                 p.parent = l;
             }
             return root;
-        }
-
-        final TreeNode<K, V> find(int h, Object k, Class<?> kc) {
-            TreeNode<K, V> p = this;
-            do {
-                int ph, dir;
-                K pk;
-                TreeNode<K, V> pl = p.left;
-                TreeNode<K, V> pr = p.right;
-                TreeNode<K, V> q;
-                if ((ph = p.hash) > h) {
-                    p = pl;
-                } else if (ph < h) {
-                    p = pr;
-                } else if ((pk = p.key) == k || (k != null && k.equals(pk))) {
-                    return p;
-                } else if (pl == null) {
-                    p = pr;
-                } else if (pr == null) {
-                    return pl;
-                } else if ((kc != null
-                        || (kc = comparableClassFor(k)) != null)
-                        && (dir = comparaComparables(kc, k, pk)) != 0) {
-                    p = (dir < 0) ? pl : pr;
-                } else if ((q = pr.find(h, k, kc)) != null) {
-                    return q;
-                } else {
-                    p = pl;
-                }
-            } while (p != null);
-            return null;
-        }
-
-        final TreeNode<K, V> putTreeVal(MyHashMap<K, V> map, Node<K, V>[] tab, int h, K k, V v) {
-            Class<?> kc = null;
-            boolean searched = false;
-            TreeNode<K, V> root = (parent != null) ? root() : this;
-            for (TreeNode<K, V> p = root; ; ) {
-                int dir = 0;
-                int ph;
-                K pk;
-                if ((ph = p.hash) > h) {
-                    dir = -1;
-                } else if (ph < h) {
-                    dir = 1;
-                } else if ((pk = p.key) == k || (k != null && k.equals(pk))) {
-                    return p;
-                }
-
-                TreeNode<K, V> xp = p;
-                if ((p = (dir <= 0) ? p.left : p.right) == null) {
-                    Node<K, V> xpn = xp.next;
-                    TreeNode<K, V> x = map.newTreeNode(h, k, v, xpn);
-                    if (dir <= 0) {
-                        xp.left = x;
-                    } else {
-                        xp.right = x;
-                    }
-                    x.parent = x.prev = xp;
-                    if (xpn != null) {
-                        ((TreeNode<K, V>) xpn).prev = xp;
-                    }
-                    moveRootToFront(tab, balanceInsertion(root, x));
-                }
-            }
         }
 
         static <K, V> TreeNode<K, V> balanceInsertion(TreeNode<K, V> root, TreeNode<K, V> x) {
@@ -621,46 +487,188 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clo
             return true;
 
         }
-    }
 
-    private TreeNode<K, V> newTreeNode(int h, K k, V v, Node<K, V> xpn) {
-
-        return new TreeNode<>(h, k, v, xpn);
-    }
-
-    private Node<K, V> replacementNode(Node<K, V> q, Node<K, V> next) {
-
-        return new Node<K, V>(q.hash, q.key, q.value, next);
-
-    }
-
-    static Class<?> comparableClassFor(Object x) {
-        if (x instanceof Comparable) {
-            Class<?> c;
-            Type[] ts;
-            Type[] as;
-            Type t;
-            ParameterizedType p;
-            if ((c = x.getClass()) == String.class) {
-                return c;
+        final TreeNode<K, V> root() {
+            for (TreeNode<K, V> r = this, p; ; ) {
+                if ((p = r.parent) == null) {
+                    return r;
+                }
+                r = p;
             }
-            if ((ts = c.getGenericInterfaces()) != null) {
-                for (int i = 0; i < ts.length; ++i) {
-                    if (((t = ts[i]) instanceof ParameterizedType)
-                            && ((p = (ParameterizedType) t).getRawType() == Comparable.class)
-                            && (as = p.getActualTypeArguments()) != null
-                            && as.length == 1 && as[0] == c) {
-                        return c;
+        }
+
+        final void split(MyHashMap<K, V> map, Node<K, V>[] tab, int index, int bit) {
+            TreeNode<K, V> b = this;
+            TreeNode<K, V> loHead = null;
+            TreeNode<K, V> lotail = null;
+            TreeNode<K, V> hiHead = null;
+            TreeNode<K, V> hiTail = null;
+            int lc = 0;
+            int hc = 0;
+            for (TreeNode<K, V> e = b, next; e != null; e = next) {
+                next = (TreeNode<K, V>) e.next;
+                e.next = null;
+                if ((e.hash & bit) == 0) {
+                    if ((e.prev = lotail) == null) {
+                        loHead = e;
+                    } else {
+                        lotail.next = e;
+                    }
+                    lotail = e;
+                    ++lc;
+                } else {
+                    if ((e.prev = hiTail) == null) {
+                        hiHead = e;
+                    } else {
+                        hiTail.next = e;
+                    }
+                    hiTail = e;
+                    ++hc;
+                }
+                if (loHead != null) {
+                    if (lc <= UNTREEIFY_THRESHOLD) {
+                        tab[index] = loHead.untreeify(map);
+                    } else {
+                        tab[index] = loHead;
+                        if (hiHead != null) {
+                            loHead.treeify(tab);
+                        }
+                    }
+                }
+                if (hiHead != null) {
+                    if (hc <= UNTREEIFY_THRESHOLD) {
+                        tab[index + bit] = hiHead.untreeify(map);
+                    } else {
+                        tab[index + bit] = hiHead;
+                        if (loHead != null) {
+                            hiHead.treeify(tab);
+                        }
                     }
                 }
             }
+        }
+
+        private void treeify(Node<K, V>[] tab) {
+            TreeNode<K, V> root = null;
+            for (TreeNode<K, V> x = this, next; x != null; x = next) {
+                next = (TreeNode<K, V>) x.next;
+                x.left = x.right = null;
+                if (root == null) {
+                    x.parent = null;
+                    x.red = false;
+                    root = x;
+                } else {
+                    K k = x.key;
+                    int h = x.hash;
+                    Class<?> kc = null;
+                    for (TreeNode<K, V> p = root; ; ) {
+                        int dir = 0;
+                        int ph;
+                        if ((ph = p.hash) > h) {
+                            dir = -1;
+                        } else if (ph < h) {
+                            dir = 1;
+                        }
+                        TreeNode<K, V> xp = p;
+                        if ((p = (dir <= 0) ? p.left : p.right) == null) {
+                            x.parent = xp;
+                            if (dir <= 0) {
+                                xp.left = x;
+                            } else {
+                                xp.right = x;
+                            }
+                            root = balanceInsertion(root, x);
+                            break;
+                        }
+                    }
+                    moveRootToFront(tab, root);
+                }
+            }
+
 
         }
-        return null;
-    }
 
-    static int comparaComparables(Class<?> kc, Object k, Object x) {
-        return (x == null || x.getClass() != kc) ? 0 : ((Comparable) k).compareTo(x);
+        final Node<K, V> untreeify(MyHashMap<K, V> map) {
+
+            Node<K, V> hd = null;
+            Node<K, V> tl = null;
+            for (Node<K, V> q = this; q != null; q = q.next) {
+                Node<K, V> p = map.replacementNode(q, null);
+                if (tl == null) {
+                    hd = p;
+                } else {
+                    tl.next = p;
+                }
+                tl = p;
+            }
+            return hd;
+
+        }
+
+        final TreeNode<K, V> find(int h, Object k, Class<?> kc) {
+            TreeNode<K, V> p = this;
+            do {
+                int ph, dir;
+                K pk;
+                TreeNode<K, V> pl = p.left;
+                TreeNode<K, V> pr = p.right;
+                TreeNode<K, V> q;
+                if ((ph = p.hash) > h) {
+                    p = pl;
+                } else if (ph < h) {
+                    p = pr;
+                } else if ((pk = p.key) == k || (k != null && k.equals(pk))) {
+                    return p;
+                } else if (pl == null) {
+                    p = pr;
+                } else if (pr == null) {
+                    return pl;
+                } else if ((kc != null
+                        || (kc = comparableClassFor(k)) != null)
+                        && (dir = comparaComparables(kc, k, pk)) != 0) {
+                    p = (dir < 0) ? pl : pr;
+                } else if ((q = pr.find(h, k, kc)) != null) {
+                    return q;
+                } else {
+                    p = pl;
+                }
+            } while (p != null);
+            return null;
+        }
+
+        final TreeNode<K, V> putTreeVal(MyHashMap<K, V> map, Node<K, V>[] tab, int h, K k, V v) {
+            Class<?> kc = null;
+            boolean searched = false;
+            TreeNode<K, V> root = (parent != null) ? root() : this;
+            for (TreeNode<K, V> p = root; ; ) {
+                int dir = 0;
+                int ph;
+                K pk;
+                if ((ph = p.hash) > h) {
+                    dir = -1;
+                } else if (ph < h) {
+                    dir = 1;
+                } else if ((pk = p.key) == k || (k != null && k.equals(pk))) {
+                    return p;
+                }
+
+                TreeNode<K, V> xp = p;
+                if ((p = (dir <= 0) ? p.left : p.right) == null) {
+                    Node<K, V> xpn = xp.next;
+                    TreeNode<K, V> x = map.newTreeNode(h, k, v, xpn);
+                    if (dir <= 0) {
+                        xp.left = x;
+                    } else {
+                        xp.right = x;
+                    }
+                    x.parent = x.prev = xp;
+                    if (xpn != null) {
+                        ((TreeNode<K, V>) xpn).prev = xp;
+                    }
+                    moveRootToFront(tab, balanceInsertion(root, x));
+                }
+            }
+        }
     }
 
 }
