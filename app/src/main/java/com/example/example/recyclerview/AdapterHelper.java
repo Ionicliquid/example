@@ -25,7 +25,7 @@ public class AdapterHelper implements OpReorderer.Callback
 
         MyRecyclerView.ViewHolder  findViewHolder(int positon);
 
-        void offsetPositionForRemovingInvisible(int positionStart, int itemCount);
+        void offsetPositionsForRemovingInvisible(int positionStart, int itemCount);
 
         void offsetPositionForRemovingLaidOutNewView(int positionStart, int itemCount);
 
@@ -35,9 +35,9 @@ public class AdapterHelper implements OpReorderer.Callback
 
         void onDispatchSecondPass(UpdateOp updateOp);
 
-        void offsetPostionForAdd(int positionStart,int itemCount);
+        void offsetPositionForAdd(int positionStart, int itemCount);
 
-        void offsetPostionForMove(int from,int to);
+        void offsetPositionForMove(int from, int to);
 
 
 

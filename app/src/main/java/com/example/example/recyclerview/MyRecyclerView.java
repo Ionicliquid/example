@@ -1,9 +1,11 @@
 package com.example.example.recyclerview;
 
 import android.content.Context;
+import android.database.Observable;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
@@ -26,9 +28,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+
 public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, ScrollingView {
 
 
+    private static final String TAG = MyRecyclerView.class.getSimpleName();
     //<editor-fold desc="方向">
 
     public static final int HORIZONTAL = LinearLayout.HORIZONTAL;
@@ -62,15 +66,77 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
     }
 
+    @Nullable
+    ViewHolder findViewHolderForPosition(int position, boolean checkNewPositon) {
+        final int childCount = mChildHelper.getUnfilteredChildCount();
+        ViewHolder hidden = null;
+        for (int i = 0; i < childCount; i++) {
+            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
+            if (holder != null && !holder.isRemoved()) {
+                if (checkNewPositon) {
+                    if (holder.mPosition != position) {
+                        continue;
+                    }
+                } else if (holder.getLayoutPosition() != position) {
+                    continue;
+                }
+                if (mChildHelper.isHidden(holder.itemView)) {
+                    hidden = holder;
+                } else {
+                    return holder;
+                }
+            }
+        }
+        return hidden;
+    }
+
+    static ViewHolder getChildViewHolderInt(View child) {
+        if (child == null) {
+            return null;
+        }
+        return ((LayoutParams) child.getLayoutParams()).mViewHolder;
+
+    }
+
+    void offsetPositionRecordsForRemove(int positionStart, int itemCount,
+                                        boolean applyToPreLayout) {
+
+        final int positionEnd = positionStart + itemCount;
+        final int childCount = mChildHelper.getUnfilteredChildCount();
+        for (int i = 0; i < childCount; i++) {
+            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
+            if(holder!=null&&!holder.shouldIgnore()){
+                if(holder.mPosition>=positionEnd){
+
+                }
+                holder.offsetPosition(-itemCount,applyToPreLayout);
+            }
+        }
+
+
+    }
+
+
     private void initAdapterManager() {
         mAdapterHelper = new AdapterHelper(new AdapterHelper.Callback() {
             @Override
-            public ViewHolder findViewHolder(int positon) {
-                return null;
+            public ViewHolder findViewHolder(int position) {
+                final ViewHolder vh = findViewHolderForPosition(position, true);
+                if (vh == null) {
+                    return null;
+                }
+                if (mChildHelper.isHidden(vh.itemView)) {
+                    if (DEBUG) {
+                        Log.d(TAG, "assuming view holder cannot be find because it is hidden");
+                    }
+                    return null;
+                }
+                return vh;
             }
 
             @Override
-            public void offsetPositionForRemovingInvisible(int positionStart, int itemCount) {
+            public void offsetPositionsForRemovingInvisible(int positionStart, int itemCount) {
+
 
             }
 
@@ -95,12 +161,12 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             }
 
             @Override
-            public void offsetPostionForAdd(int positionStart, int itemCount) {
+            public void offsetPositionForAdd(int positionStart, int itemCount) {
 
             }
 
             @Override
-            public void offsetPostionForMove(int from, int to) {
+            public void offsetPositionForMove(int from, int to) {
 
             }
         });
@@ -149,6 +215,11 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             }
 
             @Override
+            public void attachViewToParent(View child, int index, ViewGroup.LayoutParams layoutParams) {
+
+            }
+
+            @Override
             public void detachViewFromParent(int offset) {
 
             }
@@ -163,10 +234,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
             }
 
-            @Override
-            public void attachViewToParent(View child, int index, LayoutParams layoutParams) {
-
-            }
         });
     }
 
@@ -192,21 +259,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
         }
     }
 
-    ViewHolder findViewHolderForPosition(int position, boolean checkNewPositon) {
-        final int childCount = mChildHelper.getUnfilteredChildCount();
-        ViewHolder hidden = null;
-        for (int i = 0; i < childCount; i++) {
-            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
-        }
-    }
-
-    static ViewHolder getChildViewHolderInt(View child) {
-        if (child == null) {
-            return null;
-        }
-
-
-    }
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
@@ -568,6 +620,7 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
                 Log.d(TAG, "setIsRecyclable val:" + recyclable + ":" + this);
             }
         }
+
         public final boolean isRecyclable() {
             return (mFlags & FLAG_NOT_RECYCLABLE) == 0
                     && !ViewCompat.hasTransientState(itemView);
@@ -671,6 +724,403 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
         void addViewHolderToRecycledViewPool(@NonNull ViewHolder viewHolder, boolean dispatchRecycled) {
             clearNestedRecyclerViewIfNotNested(viewHolder);
 
+        }
+    }
+
+
+    public static class State{
+        static final int STEP_START = 1; //1
+        static final int STEP_LAYOUT = 1 << 1;//2
+        static final int STEP_ANIMATIONS = 1 << 2;//4
+
+
+        @IntDef(flag = true, value = {
+                STEP_START, STEP_LAYOUT, STEP_ANIMATIONS
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        @interface LayoutState {}
+
+        void assertLayoutStep(int accepted) {
+            if ((accepted & mLayoutStep) == 0) {
+                throw new IllegalStateException("Layout state should be one of "
+                        + Integer.toBinaryString(accepted) + " but it is "
+                        + Integer.toBinaryString(mLayoutStep));
+            }
+        }
+
+        int mLayoutStep = STEP_START;
+
+        int mItemCount = 0;
+
+        boolean mStructureChanged = false;
+
+        boolean mInPreLayout = false;
+
+        boolean mTrackOldChangeHolders = false;
+
+        boolean mIsMeasuring = false;
+
+        boolean mRunSimpleAnimations = false;
+
+        boolean mRunPredictiveAnimations = false;
+
+        int mPreviousLayoutItemCount = 0;
+
+        int mDeletedInvisibleItemCountSincePreviousLayout = 0;
+
+        int mFocusedItemPosition;
+        long mFocusedItemId;
+
+        int mFocusedSubChildId;
+
+        int mRemainingScrollHorizontal;
+        int mRemainingScrollVertical;
+
+
+        int mTargetPosition = RecyclerView.NO_POSITION;
+
+        private SparseArray<Object> mData;
+
+        State reset() {
+            mTargetPosition = RecyclerView.NO_POSITION;
+            if (mData != null) {
+                mData.clear();
+            }
+            mItemCount = 0;
+            mStructureChanged = false;
+            mIsMeasuring = false;
+            return this;
+        }
+
+        void prepareForNestedPrefetch(Adapter adapter) {
+            mLayoutStep = STEP_START;
+            mItemCount = adapter.getItemCount();
+            mInPreLayout = false;
+            mTrackOldChangeHolders = false;
+            mIsMeasuring = false;
+        }
+
+        public boolean isMeasuring() {
+            return mIsMeasuring;
+        }
+
+        public boolean isPreLayout() {
+            return mInPreLayout;
+        }
+
+        public boolean willRunPredictiveAnimations() {
+
+            return mRunPredictiveAnimations;
+        }
+        public boolean willRunSimpleAnimations() {
+
+            return mRunSimpleAnimations;
+        }
+
+        public void remove(int resourceId) {
+            if (mData == null) {
+                return;
+            }
+            mData.remove(resourceId);
+        }
+        public <T> T get(int resourceId) {
+            if (mData == null) {
+                return null;
+            }
+            return (T) mData.get(resourceId);
+        }
+
+        public void put(int resourceId, Object data) {
+            if (mData == null) {
+                mData = new SparseArray<Object>();
+            }
+            mData.put(resourceId, data);
+        }
+
+        public int getTargetScrollPosition() {
+            return mTargetPosition;
+        }
+
+        public boolean hasTargetScrollPosition() {
+            return mTargetPosition != RecyclerView.NO_POSITION;
+        }
+
+
+        public boolean didStructureChange() {
+            return mStructureChanged;
+        }
+
+        public int getItemCount() {
+            return mInPreLayout
+                    ? (mPreviousLayoutItemCount - mDeletedInvisibleItemCountSincePreviousLayout)
+                    : mItemCount;
+        }
+
+        public int getRemainingScrollHorizontal() {
+            return mRemainingScrollHorizontal;
+        }
+
+        public int getRemainingScrollVertical() {
+            return mRemainingScrollVertical;
+        }
+
+
+        @Override
+        public String toString() {
+            return "State{"
+                    + "mTargetPosition=" + mTargetPosition
+                    + ", mData=" + mData
+                    + ", mItemCount=" + mItemCount
+                    + ", mIsMeasuring=" + mIsMeasuring
+                    + ", mPreviousLayoutItemCount=" + mPreviousLayoutItemCount
+                    + ", mDeletedInvisibleItemCountSincePreviousLayout="
+                    + mDeletedInvisibleItemCountSincePreviousLayout
+                    + ", mStructureChanged=" + mStructureChanged
+                    + ", mInPreLayout=" + mInPreLayout
+                    + ", mRunSimpleAnimations=" + mRunSimpleAnimations
+                    + ", mRunPredictiveAnimations=" + mRunPredictiveAnimations
+                    + '}';
+        }
+    }
+
+    public static abstract class Adapter<VH extends ViewHolder>{
+
+
+        private final AdapterDataObservable mObservable = new AdapterDataObservable();
+        private boolean mHasStableIds = false;
+
+        @NonNull
+        public abstract VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType);
+
+
+        public abstract void onBindViewHolder(@NonNull VH holder, int position);
+
+
+        public void onBindViewHolder(@NonNull VH holder, int position,
+                                     @NonNull List<Object> payloads) {
+            onBindViewHolder(holder, position);
+        }
+
+        @NonNull
+        public final VH createViewHolder(@NonNull ViewGroup parent, int viewType) {
+            try {
+
+                final VH holder = onCreateViewHolder(parent, viewType);
+                if (holder.itemView.getParent() != null) {
+                    throw new IllegalStateException("ViewHolder views must not be attached when"
+                            + " created. Ensure that you are not passing 'true' to the attachToRoot"
+                            + " parameter of LayoutInflater.inflate(..., boolean attachToRoot)");
+                }
+                holder.mItemViewType = viewType;
+                return holder;
+            } finally {
+
+            }
+        }
+
+        public final void bindViewHolder(@NonNull VH holder, int position) {
+            holder.mPosition = position;
+            if (hasStableIds()) {
+                holder.mItemId = getItemId(position);
+            }
+            holder.setFlags(ViewHolder.FLAG_BOUND,
+                    ViewHolder.FLAG_BOUND | ViewHolder.FLAG_UPDATE | ViewHolder.FLAG_INVALID
+                            | ViewHolder.FLAG_ADAPTER_POSITION_UNKNOWN);
+            onBindViewHolder(holder, position, holder.getUnmodifiedPayloads());
+            holder.clearPayload();
+            final ViewGroup.LayoutParams layoutParams = holder.itemView.getLayoutParams();
+            if (layoutParams instanceof RecyclerView.LayoutParams) {
+                ((LayoutParams) layoutParams).mInsetsDirty = true;
+            }
+
+        }
+        public int getItemViewType(int position) {
+
+
+            return 0;
+        }
+
+        public void setHasStableIds(boolean hasStableIds) {
+            if (hasObservers()) {
+                throw new IllegalStateException("Cannot change whether this adapter has "
+                        + "stable IDs while the adapter has registered observers.");
+            }
+            mHasStableIds = hasStableIds;
+        }
+
+        public long getItemId(int position) {
+
+
+            return NO_ID;
+        }
+
+        public abstract int getItemCount();
+
+        public final boolean hasStableIds() {
+            return mHasStableIds;
+        }
+
+        public void onViewRecycled(@NonNull VH holder) {
+        }
+
+        public boolean onFailedToRecycleView(@NonNull VH holder) {
+            return false;
+        }
+
+
+        public void onViewAttachedToWindow(@NonNull VH holder) {
+        }
+
+        public void onViewDetachedFromWindow(@NonNull VH holder) {
+        }
+
+        public final boolean hasObservers() {
+            return mObservable.hasObservers();
+        }
+
+        public void registerAdapterDataObserver(@NonNull AdapterDataObserver observer) {
+            mObservable.registerObserver(observer);
+        }
+
+        public void unregisterAdapterDataObserver(@NonNull AdapterDataObserver observer) {
+            mObservable.unregisterObserver(observer);
+        }
+
+        public void onAttachedToRecyclerView(@NonNull RecyclerView recyclerView) {
+        }
+
+        public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
+        }
+
+        public final void notifyDataSetChanged() {
+            mObservable.notifyChanged();
+        }
+
+        public final void notifyItemChanged(int position) {
+            mObservable.notifyItemRangeChanged(position, 1);
+        }
+
+
+        public final void notifyItemChanged(int position, @Nullable Object payload) {
+            mObservable.notifyItemRangeChanged(position, 1, payload);
+        }
+
+        public final void notifyItemRangeChanged(int positionStart, int itemCount) {
+            mObservable.notifyItemRangeChanged(positionStart, itemCount);
+        }
+
+        public final void notifyItemRangeChanged(int positionStart, int itemCount,
+                                                 @Nullable Object payload) {
+            mObservable.notifyItemRangeChanged(positionStart, itemCount, payload);
+        }
+
+        public final void notifyItemInserted(int position) {
+            mObservable.notifyItemRangeInserted(position, 1);
+        }
+
+        public final void notifyItemMoved(int fromPosition, int toPosition) {
+            mObservable.notifyItemMoved(fromPosition, toPosition);
+        }
+
+        public final void notifyItemRangeInserted(int positionStart, int itemCount) {
+            mObservable.notifyItemRangeInserted(positionStart, itemCount);
+        }
+
+        public final void notifyItemRemoved(int position) {
+            mObservable.notifyItemRangeRemoved(position, 1);
+        }
+
+        public final void notifyItemRangeRemoved(int positionStart, int itemCount) {
+            mObservable.notifyItemRangeRemoved(positionStart, itemCount);
+        }
+    }
+
+    static class AdapterDataObservable extends Observable<AdapterDataObserver> {
+
+
+        public boolean hasObservers(){
+            return !mObservers.isEmpty();
+        }
+
+        public void notifyChanged() {
+            // since onChanged() is implemented by the app, it could do anything, including
+            // removing itself from {@link mObservers} - and that could cause problems if
+            // an iterator is used on the ArrayList {@link mObservers}.
+            // to avoid such problems, just march thru the list in the reverse order.
+            for (int i = mObservers.size() - 1; i >= 0; i--) {
+                mObservers.get(i).onChanged();
+            }
+        }
+
+        public void notifyItemRangeChanged(int positionStart, int itemCount) {
+            notifyItemRangeChanged(positionStart, itemCount, null);
+        }
+
+        public void notifyItemRangeChanged(int positionStart, int itemCount,
+                                           @Nullable Object payload) {
+            // since onItemRangeChanged() is implemented by the app, it could do anything, including
+            // removing itself from {@link mObservers} - and that could cause problems if
+            // an iterator is used on the ArrayList {@link mObservers}.
+            // to avoid such problems, just march thru the list in the reverse order.
+            for (int i = mObservers.size() - 1; i >= 0; i--) {
+                mObservers.get(i).onItemRangeChanged(positionStart, itemCount, payload);
+            }
+        }
+
+        public void notifyItemRangeInserted(int positionStart, int itemCount) {
+            // since onItemRangeInserted() is implemented by the app, it could do anything,
+            // including removing itself from {@link mObservers} - and that could cause problems if
+            // an iterator is used on the ArrayList {@link mObservers}.
+            // to avoid such problems, just march thru the list in the reverse order.
+            for (int i = mObservers.size() - 1; i >= 0; i--) {
+                mObservers.get(i).onItemRangeInserted(positionStart, itemCount);
+            }
+        }
+
+        public void notifyItemRangeRemoved(int positionStart, int itemCount) {
+            // since onItemRangeRemoved() is implemented by the app, it could do anything, including
+            // removing itself from {@link mObservers} - and that could cause problems if
+            // an iterator is used on the ArrayList {@link mObservers}.
+            // to avoid such problems, just march thru the list in the reverse order.
+            for (int i = mObservers.size() - 1; i >= 0; i--) {
+                mObservers.get(i).onItemRangeRemoved(positionStart, itemCount);
+            }
+        }
+
+        public void notifyItemMoved(int fromPosition, int toPosition) {
+            for (int i = mObservers.size() - 1; i >= 0; i--) {
+                mObservers.get(i).onItemRangeMoved(fromPosition, toPosition, 1);
+            }
+        }
+
+
+    }
+
+    public abstract static class AdapterDataObserver{
+        public void onItemRangeChanged(int positionStart, int itemCount) {
+            // do nothing
+        }
+
+        public void onChanged() {
+            // Do nothing
+        }
+
+        public void onItemRangeChanged(int positionStart, int itemCount, @Nullable Object payload) {
+            // fallback to onItemRangeChanged(positionStart, itemCount) if app
+            // does not override this method.
+            onItemRangeChanged(positionStart, itemCount);
+        }
+
+        public void onItemRangeInserted(int positionStart, int itemCount) {
+            // do nothing
+        }
+
+        public void onItemRangeRemoved(int positionStart, int itemCount) {
+            // do nothing
+        }
+
+        public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+            // do nothing
         }
     }
 }
