@@ -3,6 +3,7 @@ package com.example.example.recyclerview;
 import android.content.Context;
 import android.database.Observable;
 import android.graphics.Rect;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -19,6 +20,7 @@ import androidx.annotation.VisibleForTesting;
 import androidx.core.view.NestedScrollingChild2;
 import androidx.core.view.ScrollingView;
 import androidx.core.view.ViewCompat;
+import androidx.recyclerview.widget.GapWorker;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.lang.annotation.Retention;
@@ -32,20 +34,21 @@ import java.util.List;
 public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, ScrollingView {
 
 
-    private static final String TAG = MyRecyclerView.class.getSimpleName();
-    //<editor-fold desc="方向">
-
     public static final int HORIZONTAL = LinearLayout.HORIZONTAL;
+    //<editor-fold desc="方向">
     public static final int VERTICAL = LinearLayout.VERTICAL;
     public static final int NO_POSITION = -1;
     public static final long NO_ID = -1;
     //</editor-fold>
     public static final int INVALID_TYPE = -1;
+    public static final boolean DEBUG = false;
     static final int DEAFAULT_ORIENTATION = VERTICAL;
+    private static final String TAG = MyRecyclerView.class.getSimpleName();
     AdapterHelper mAdapterHelper;
     ChildHelper mChildHelper;
     private int mTouchSlop;
-    public static final boolean DEBUG = false;
+    private boolean mItemAddedOrRemoved = false;
+    private State mState = new State();
 
     public MyRecyclerView(Context context) {
         this(context, null);
@@ -66,57 +69,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
     }
 
-    @Nullable
-    ViewHolder findViewHolderForPosition(int position, boolean checkNewPositon) {
-        final int childCount = mChildHelper.getUnfilteredChildCount();
-        ViewHolder hidden = null;
-        for (int i = 0; i < childCount; i++) {
-            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
-            if (holder != null && !holder.isRemoved()) {
-                if (checkNewPositon) {
-                    if (holder.mPosition != position) {
-                        continue;
-                    }
-                } else if (holder.getLayoutPosition() != position) {
-                    continue;
-                }
-                if (mChildHelper.isHidden(holder.itemView)) {
-                    hidden = holder;
-                } else {
-                    return holder;
-                }
-            }
-        }
-        return hidden;
-    }
-
-    static ViewHolder getChildViewHolderInt(View child) {
-        if (child == null) {
-            return null;
-        }
-        return ((LayoutParams) child.getLayoutParams()).mViewHolder;
-
-    }
-
-    void offsetPositionRecordsForRemove(int positionStart, int itemCount,
-                                        boolean applyToPreLayout) {
-
-        final int positionEnd = positionStart + itemCount;
-        final int childCount = mChildHelper.getUnfilteredChildCount();
-        for (int i = 0; i < childCount; i++) {
-            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
-            if(holder!=null&&!holder.shouldIgnore()){
-                if(holder.mPosition>=positionEnd){
-
-                }
-                holder.offsetPosition(-itemCount,applyToPreLayout);
-            }
-        }
-
-
-    }
-
-
     private void initAdapterManager() {
         mAdapterHelper = new AdapterHelper(new AdapterHelper.Callback() {
             @Override
@@ -136,13 +88,16 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
             @Override
             public void offsetPositionsForRemovingInvisible(int positionStart, int itemCount) {
-
+                offsetPositionRecordsForRemove(positionStart, itemCount, true);
+                mItemAddedOrRemoved = true;
+                mState.mDeletedInvisibleItemCountSincePreviousLayout += itemCount;
 
             }
 
             @Override
             public void offsetPositionForRemovingLaidOutNewView(int positionStart, int itemCount) {
-
+                offsetPositionRecordsForRemove(positionStart, itemCount, false);
+                mItemAddedOrRemoved = true;
             }
 
             @Override
@@ -186,7 +141,7 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
             @Override
             public int indexOfChild(View view) {
-
+                return 0;
             }
 
             @Override
@@ -235,6 +190,56 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             }
 
         });
+    }
+
+    @Nullable
+    ViewHolder findViewHolderForPosition(int position, boolean checkNewPositon) {
+        final int childCount = mChildHelper.getUnfilteredChildCount();
+        ViewHolder hidden = null;
+        for (int i = 0; i < childCount; i++) {
+            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
+            if (holder != null && !holder.isRemoved()) {
+                if (checkNewPositon) {
+                    if (holder.mPosition != position) {
+                        continue;
+                    }
+                } else if (holder.getLayoutPosition() != position) {
+                    continue;
+                }
+                if (mChildHelper.isHidden(holder.itemView)) {
+                    hidden = holder;
+                } else {
+                    return holder;
+                }
+            }
+        }
+        return hidden;
+    }
+
+    void offsetPositionRecordsForRemove(int positionStart, int itemCount,
+                                        boolean applyToPreLayout) {
+
+        final int positionEnd = positionStart + itemCount;
+        final int childCount = mChildHelper.getUnfilteredChildCount();
+        for (int i = 0; i < childCount; i++) {
+            final ViewHolder holder = getChildViewHolderInt(mChildHelper.getUnfilteredChildAt(i));
+            if (holder != null && !holder.shouldIgnore()) {
+                if (holder.mPosition >= positionEnd) {
+
+                }
+                holder.offsetPosition(-itemCount, applyToPreLayout);
+            }
+        }
+
+
+    }
+
+    static ViewHolder getChildViewHolderInt(View child) {
+        if (child == null) {
+            return null;
+        }
+        return ((LayoutParams) child.getLayoutParams()).mViewHolder;
+
     }
 
     public MyRecyclerView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
@@ -389,6 +394,10 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             mPosition = mNewPosition;
         }
 
+        void addFlags(int flags) {
+            mFlags |= flags;
+        }
+
         void offsetPosition(int offset, boolean applyToPreLayout) {
             if (mOldPosition == NO_POSITION) {
                 mOldPosition = mPosition;
@@ -416,10 +425,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             }
         }
 
-        boolean shouldIgnore() {
-            return (mFlags & FLAG_IGNORE) != 0;
-        }
-
         public final int getLayoutPosition() {
             return mPreLayoutPosition == NO_POSITION ? mPosition : mPreLayoutPosition;
         }
@@ -441,10 +446,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
         public final int getItemViewType() {
             return mItemViewType;
-        }
-
-        boolean isScrap() {
-            return mScrapContainer != null;
         }
 
         void unScrap() {
@@ -472,40 +473,12 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             mInChangeScrap = isChangeScrap;
         }
 
-        boolean isInvalid() {
-            return (mFlags & FLAG_INVALID) != 0;
-        }
-
-        boolean needsUpdate() {
-            return (mFlags & FLAG_UPDATE) != 0;
-        }
-
-        boolean isBound() {
-            return (mFlags & FLAG_BOUND) != 0;
-        }
-
-        boolean isRemoved() {
-            return (mFlags & FLAG_REMOVED) != 0;
-        }
-
         boolean hasAnyOfTheFlags(int flags) {
             return (mFlags & flags) != 0;
         }
 
-        boolean isTmpDetached() {
-            return (mFlags & FLAG_TMP_DETACHED) != 0;
-        }
-
-        boolean isAdapterPositionUnknown() {
-            return (mFlags & FLAG_ADAPTER_POSITION_UNKNOWN) != 0 || isInvalid();
-        }
-
         void setFlags(int flags, int mask) {
             mFlags = (mFlags & ~mask) | (flags & mask);
-        }
-
-        void addFlags(int flags) {
-            mFlags |= flags;
         }
 
         void addChangePayload(Object payload) {
@@ -522,13 +495,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
                 mPayloads = new ArrayList<Object>();
                 mUnmodifiedPayloads = Collections.unmodifiableList(mPayloads);
             }
-        }
-
-        void clearPayload() {
-            if (mPayloads != null) {
-                mPayloads.clear();
-            }
-            mFlags = mFlags & ~FLAG_ADAPTER_FULLUPDATE;
         }
 
         List<Object> getUnmodifiedPayloads() {
@@ -558,6 +524,13 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             mWasImportantForAccessibilityBeforeHidden = ViewCompat.IMPORTANT_FOR_ACCESSIBILITY_AUTO;
             mPendingAccessibilityState = PENDING_ACCESSIBILITY_STATE_NOT_SET;
             clearNestedRecyclerViewIfNotNested(this);
+        }
+
+        void clearPayload() {
+            if (mPayloads != null) {
+                mPayloads.clear();
+            }
+            mFlags = mFlags & ~FLAG_ADAPTER_FULLUPDATE;
         }
 
         void onEnteredHiddenState(MyRecyclerView parent) {
@@ -601,6 +574,43 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             return sb.toString();
         }
 
+        boolean isScrap() {
+            return mScrapContainer != null;
+        }
+
+        boolean isInvalid() {
+            return (mFlags & FLAG_INVALID) != 0;
+        }
+
+        boolean isBound() {
+            return (mFlags & FLAG_BOUND) != 0;
+        }
+
+        boolean needsUpdate() {
+            return (mFlags & FLAG_UPDATE) != 0;
+        }
+
+        boolean isRemoved() {
+            return (mFlags & FLAG_REMOVED) != 0;
+        }
+
+        boolean shouldIgnore() {
+            return (mFlags & FLAG_IGNORE) != 0;
+        }
+
+        boolean isTmpDetached() {
+            return (mFlags & FLAG_TMP_DETACHED) != 0;
+        }
+
+        public final boolean isRecyclable() {
+            return (mFlags & FLAG_NOT_RECYCLABLE) == 0
+                    && !ViewCompat.hasTransientState(itemView);
+        }
+
+        boolean isAdapterPositionUnknown() {
+            return (mFlags & FLAG_ADAPTER_POSITION_UNKNOWN) != 0 || isInvalid();
+        }
+
         public final void setIsRecyclable(boolean recyclable) {
             mIsRecyclableCount = recyclable ? mIsRecyclableCount - 1 : mIsRecyclableCount + 1;
             if (mIsRecyclableCount < 0) {
@@ -620,12 +630,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
                 Log.d(TAG, "setIsRecyclable val:" + recyclable + ":" + this);
             }
         }
-
-        public final boolean isRecyclable() {
-            return (mFlags & FLAG_NOT_RECYCLABLE) == 0
-                    && !ViewCompat.hasTransientState(itemView);
-        }
-
 
         boolean shouldBeKeptAsChild() {
             return (mFlags & FLAG_NOT_RECYCLABLE) != 0;
@@ -687,58 +691,27 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
         }
     }
 
-    public final class Recycler {
-        static final int DEFAULT_CACHE_SIZE = 2;
-        final ArrayList<ViewHolder> mAttachedScrap = new ArrayList<>();
-        final ArrayList<ViewHolder> mCachedViews = new ArrayList<>();
-
-        private final List<ViewHolder> mUnmodifiableAttachedScrap = Collections.unmodifiableList(mAttachedScrap);
-        ArrayList<ViewHolder> mChangedScrap = null;
-        int mViewCacheMax = DEFAULT_CACHE_SIZE;
-
-
-        RecycledViewPool mRecyclerPool;
-        private int mRequestCacheMax = DEFAULT_CACHE_SIZE;
-        private ViewCacheExtension mViewCacheExtension;
-
-        public void clear() {
-            mAttachedScrap.clear();
-            recycleAndClearCachedViews();
-
-        }
-
-        void recycleAndClearCachedViews() {
-            final int count = mCachedViews.size();
-            for (int i = count - 1; i >= 0; i--) {
-
-            }
-            mCachedViews.clear();
-
-        }
-
-        void recycleCachedViewAt(int cachedViewIndex) {
-            ViewHolder viewHolder = mCachedViews.get(cachedViewIndex);
-            mCachedViews.remove(cachedViewIndex);
-        }
-
-        void addViewHolderToRecycledViewPool(@NonNull ViewHolder viewHolder, boolean dispatchRecycled) {
-            clearNestedRecyclerViewIfNotNested(viewHolder);
-
-        }
-    }
-
-
-    public static class State{
+    public static class State {
         static final int STEP_START = 1; //1
         static final int STEP_LAYOUT = 1 << 1;//2
         static final int STEP_ANIMATIONS = 1 << 2;//4
-
-
-        @IntDef(flag = true, value = {
-                STEP_START, STEP_LAYOUT, STEP_ANIMATIONS
-        })
-        @Retention(RetentionPolicy.SOURCE)
-        @interface LayoutState {}
+        int mLayoutStep = STEP_START;
+        int mItemCount = 0;
+        boolean mStructureChanged = false;
+        boolean mInPreLayout = false;
+        boolean mTrackOldChangeHolders = false;
+        boolean mIsMeasuring = false;
+        boolean mRunSimpleAnimations = false;
+        boolean mRunPredictiveAnimations = false;
+        int mPreviousLayoutItemCount = 0;
+        int mDeletedInvisibleItemCountSincePreviousLayout = 0;
+        int mFocusedItemPosition;
+        long mFocusedItemId;
+        int mFocusedSubChildId;
+        int mRemainingScrollHorizontal;
+        int mRemainingScrollVertical;
+        int mTargetPosition = RecyclerView.NO_POSITION;
+        private SparseArray<Object> mData;
 
         void assertLayoutStep(int accepted) {
             if ((accepted & mLayoutStep) == 0) {
@@ -747,39 +720,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
                         + Integer.toBinaryString(mLayoutStep));
             }
         }
-
-        int mLayoutStep = STEP_START;
-
-        int mItemCount = 0;
-
-        boolean mStructureChanged = false;
-
-        boolean mInPreLayout = false;
-
-        boolean mTrackOldChangeHolders = false;
-
-        boolean mIsMeasuring = false;
-
-        boolean mRunSimpleAnimations = false;
-
-        boolean mRunPredictiveAnimations = false;
-
-        int mPreviousLayoutItemCount = 0;
-
-        int mDeletedInvisibleItemCountSincePreviousLayout = 0;
-
-        int mFocusedItemPosition;
-        long mFocusedItemId;
-
-        int mFocusedSubChildId;
-
-        int mRemainingScrollHorizontal;
-        int mRemainingScrollVertical;
-
-
-        int mTargetPosition = RecyclerView.NO_POSITION;
-
-        private SparseArray<Object> mData;
 
         State reset() {
             mTargetPosition = RecyclerView.NO_POSITION;
@@ -812,6 +752,7 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
             return mRunPredictiveAnimations;
         }
+
         public boolean willRunSimpleAnimations() {
 
             return mRunSimpleAnimations;
@@ -823,6 +764,7 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             }
             mData.remove(resourceId);
         }
+
         public <T> T get(int resourceId) {
             if (mData == null) {
                 return null;
@@ -845,7 +787,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             return mTargetPosition != RecyclerView.NO_POSITION;
         }
 
-
         public boolean didStructureChange() {
             return mStructureChanged;
         }
@@ -864,7 +805,6 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             return mRemainingScrollVertical;
         }
 
-
         @Override
         public String toString() {
             return "State{"
@@ -881,25 +821,21 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
                     + ", mRunPredictiveAnimations=" + mRunPredictiveAnimations
                     + '}';
         }
+
+
+        @IntDef(flag = true, value = {
+                STEP_START, STEP_LAYOUT, STEP_ANIMATIONS
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        @interface LayoutState {
+        }
     }
 
-    public static abstract class Adapter<VH extends ViewHolder>{
+    public static abstract class Adapter<VH extends ViewHolder> {
 
 
         private final AdapterDataObservable mObservable = new AdapterDataObservable();
         private boolean mHasStableIds = false;
-
-        @NonNull
-        public abstract VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType);
-
-
-        public abstract void onBindViewHolder(@NonNull VH holder, int position);
-
-
-        public void onBindViewHolder(@NonNull VH holder, int position,
-                                     @NonNull List<Object> payloads) {
-            onBindViewHolder(holder, position);
-        }
 
         @NonNull
         public final VH createViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -918,6 +854,9 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             }
         }
 
+        @NonNull
+        public abstract VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType);
+
         public final void bindViewHolder(@NonNull VH holder, int position) {
             holder.mPosition = position;
             if (hasStableIds()) {
@@ -934,6 +873,24 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             }
 
         }
+
+        public final boolean hasStableIds() {
+            return mHasStableIds;
+        }
+
+        public long getItemId(int position) {
+
+
+            return NO_ID;
+        }
+
+        public void onBindViewHolder(@NonNull VH holder, int position,
+                                     @NonNull List<Object> payloads) {
+            onBindViewHolder(holder, position);
+        }
+
+        public abstract void onBindViewHolder(@NonNull VH holder, int position);
+
         public int getItemViewType(int position) {
 
 
@@ -948,17 +905,11 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             mHasStableIds = hasStableIds;
         }
 
-        public long getItemId(int position) {
-
-
-            return NO_ID;
+        public final boolean hasObservers() {
+            return mObservable.hasObservers();
         }
 
         public abstract int getItemCount();
-
-        public final boolean hasStableIds() {
-            return mHasStableIds;
-        }
 
         public void onViewRecycled(@NonNull VH holder) {
         }
@@ -967,15 +918,10 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             return false;
         }
 
-
         public void onViewAttachedToWindow(@NonNull VH holder) {
         }
 
         public void onViewDetachedFromWindow(@NonNull VH holder) {
-        }
-
-        public final boolean hasObservers() {
-            return mObservable.hasObservers();
         }
 
         public void registerAdapterDataObserver(@NonNull AdapterDataObserver observer) {
@@ -1038,7 +984,7 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
     static class AdapterDataObservable extends Observable<AdapterDataObserver> {
 
 
-        public boolean hasObservers(){
+        public boolean hasObservers() {
             return !mObservers.isEmpty();
         }
 
@@ -1096,11 +1042,7 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
     }
 
-    public abstract static class AdapterDataObserver{
-        public void onItemRangeChanged(int positionStart, int itemCount) {
-            // do nothing
-        }
-
+    public abstract static class AdapterDataObserver {
         public void onChanged() {
             // Do nothing
         }
@@ -1109,6 +1051,10 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             // fallback to onItemRangeChanged(positionStart, itemCount) if app
             // does not override this method.
             onItemRangeChanged(positionStart, itemCount);
+        }
+
+        public void onItemRangeChanged(int positionStart, int itemCount) {
+            // do nothing
         }
 
         public void onItemRangeInserted(int positionStart, int itemCount) {
@@ -1121,6 +1067,55 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
 
         public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
             // do nothing
+        }
+    }
+
+    static final boolean ALLOW_THREAD_GAP_WORK = Build.VERSION.SDK_INT >= 21;
+
+    GapWorker mGapWorker;
+    GapWorker.LayoutPrefetchRegistryImpl mPrefetchRegistry =
+            ALLOW_THREAD_GAP_WORK ? new GapWorker.LayoutPrefetchRegistryImpl() : null;
+
+    public final class Recycler {
+
+        static final int DEFAULT_CACHE_SIZE = 2;
+
+        final ArrayList<ViewHolder> mAttachedScrap = new ArrayList<>();
+
+        final ArrayList<ViewHolder> mCachedViews = new ArrayList<>();
+
+        private final List<ViewHolder> mUnmodifiableAttachedScrap = Collections.unmodifiableList(mAttachedScrap);
+        ArrayList<ViewHolder> mChangedScrap = null;
+        int mViewCacheMax = DEFAULT_CACHE_SIZE;
+
+
+        RecycledViewPool mRecyclerPool;
+        private int mRequestCacheMax = DEFAULT_CACHE_SIZE;
+        private ViewCacheExtension mViewCacheExtension;
+
+        public void clear() {
+            mAttachedScrap.clear();
+            recycleAndClearCachedViews();
+
+        }
+
+        void recycleAndClearCachedViews() {
+            final int count = mCachedViews.size();
+            for (int i = count - 1; i >= 0; i--) {
+
+            }
+            mCachedViews.clear();
+
+        }
+
+        void recycleCachedViewAt(int cachedViewIndex) {
+            ViewHolder viewHolder = mCachedViews.get(cachedViewIndex);
+            mCachedViews.remove(cachedViewIndex);
+        }
+
+        void addViewHolderToRecycledViewPool(@NonNull ViewHolder viewHolder, boolean dispatchRecycled) {
+            clearNestedRecyclerViewIfNotNested(viewHolder);
+
         }
     }
 }
