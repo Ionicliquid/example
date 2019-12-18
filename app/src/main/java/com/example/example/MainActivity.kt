@@ -3,6 +3,7 @@ package com.example.example
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
+import io.reactivex.rxjava3.core.Observable
 
 class MainActivity : AppCompatActivity() {
 

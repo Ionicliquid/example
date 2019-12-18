@@ -22,6 +22,8 @@ import androidx.core.view.ScrollingView;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.GapWorker;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.ViewBoundsCheck;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -1117,5 +1119,51 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
             clearNestedRecyclerViewIfNotNested(viewHolder);
 
         }
+    }
+
+    public abstract static class LayoutManager{
+        ChildHelper mChildHelper;
+        MyRecyclerView mRecyclerView;
+
+
+        private final ViewBoundCheck.Callback mHorizontalBoundCheckCallBack = new ViewBoundCheck.Callback() {
+            @Override
+            public int getChildCount() {
+                return 0;
+            }
+
+            @NotNull
+            @Override
+            public View getParent() {
+                return null;
+            }
+
+            @NotNull
+            @Override
+            public View getChildAt(int index) {
+                return null;
+            }
+
+            @Override
+            public int getParentStart() {
+                return 0;
+            }
+
+            @Override
+            public int getParentEnd() {
+                return 0;
+            }
+
+            @Override
+            public int getChildStart(@NotNull View view) {
+                return 0;
+            }
+
+            @Override
+            public int getChildEnd(@NotNull View view) {
+                return 0;
+            }
+        };
+
     }
 }
