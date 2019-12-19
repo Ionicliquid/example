@@ -3,16 +3,14 @@ package com.example.example;
 public class TestJava {
 
     public static void main(String[] args) {
-        Name n = new Name("liqiao");
-        Name m = n;
-        Name y = n;
-        y.setX("xxxx");
-        System.out.println(m.getX());
+        Name.Gender gender = new Name.Gender();
     }
 }
 
 class Name {
     String x;
+
+    public static int y = 1;
 
     public Name(String x) {
         this.x = x;
@@ -23,6 +21,12 @@ class Name {
     }
 
     public void setX(String x) {
+
         this.x = x;
+        Gender g = new Gender();
+    }
+
+    static class Gender{
+
     }
 }

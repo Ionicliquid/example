@@ -1,4 +1,4 @@
-package com.example.example.rxjava;
+package com.example.example.rxjava.disposables;
 
 public interface Disposable {
 
