@@ -1,4 +1,4 @@
-package com.example.example.rxjava
+package com.example.example.rxjava.schedulers
 
 import io.reactivex.rxjava3.annotations.NonNull
 

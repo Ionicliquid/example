@@ -1,5 +1,8 @@
-package com.example.example.rxjava
+package com.example.example.rxjava.internal.disposables
 
+import android.annotation.SuppressLint
+import android.os.Parcel
+import android.os.Parcelable
 import com.example.example.rxjava.disposables.Disposable
 import io.reactivex.rxjava3.exceptions.ProtocolViolationException
 import io.reactivex.rxjava3.internal.functions.ObjectHelper
@@ -121,4 +124,46 @@ enum class DisposableHelper : Disposable {
         }
 
     }
+}
+
+
+
+class SequentialDisposable() :AtomicReference<Disposable>(),Disposable, Parcelable {
+
+    private val serialVersionUID = -754898800686245608L
+
+    constructor(parcel: Parcel) : this() {
+    }
+
+
+    constructor(disposable: SequentialDisposable) :this(){
+
+    }
+
+    override fun dispose() {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    override fun isDisposed(): Boolean {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    override fun writeToParcel(parcel: Parcel, flags: Int) {
+
+    }
+
+    override fun describeContents(): Int {
+        return 0
+    }
+
+    companion object CREATOR : Parcelable.Creator<SequentialDisposable> {
+        override fun createFromParcel(parcel: Parcel): SequentialDisposable {
+            return SequentialDisposable(parcel)
+        }
+
+        override fun newArray(size: Int): Array<SequentialDisposable?> {
+            return arrayOfNulls(size)
+        }
+    }
+
 }

@@ -3,8 +3,14 @@ package com.example.example.rxjava;
 
 
 import com.example.example.rxjava.disposables.Disposable;
+import com.example.example.rxjava.internal.disposables.SequentialDisposable;
+import com.example.example.rxjava.schedulers.SchedulerRunnableIntrospection;
+
 import io.reactivex.rxjava3.annotations.NonNull;
 import io.reactivex.rxjava3.annotations.Nullable;
+
+import io.reactivex.rxjava3.internal.disposables.EmptyDisposable;
+
 import io.reactivex.rxjava3.plugins.RxJavaPlugins;
 import org.jetbrains.annotations.NotNull;
 
@@ -65,7 +71,36 @@ public abstract class Scheduler {
         public abstract Disposable schedule(@NonNull Runnable run, long delay, @NonNull TimeUnit unit);
 
 
+        @NonNull
+        public Disposable schedulePeriodically(@NonNull Runnable run, final long initialDelay, final long period, @NonNull final TimeUnit unit) {
+            final SequentialDisposable first = new SequentialDisposable();
+
+            final SequentialDisposable sd = new SequentialDisposable(first);
+
+            final Runnable decoratedRun = RxJavaPlugins.onSchedule(run);
+
+            final long periodInNanoseconds = unit.toNanos(period);
+            final long firstNowNanoseconds = now(TimeUnit.NANOSECONDS);
+            final long firstStartInNanoseconds = firstNowNanoseconds + unit.toNanos(initialDelay);
+
+            Disposable d = schedule(new PeriodicTask(firstStartInNanoseconds, decoratedRun, firstNowNanoseconds, sd,
+                    periodInNanoseconds), initialDelay, unit);
+
+            if (d == EmptyDisposable.INSTANCE) {
+                return d;
+            }
+            first.replace(d);
+
+            return sd;
+        }
+
     }
+
+    public static long now(@NonNull TimeUnit unit) {
+        return unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    }
+
+
 
     static final class DisposeTask implements Disposable, Runnable, SchedulerRunnableIntrospection {
 
@@ -107,6 +142,43 @@ public abstract class Scheduler {
                 dispose();
                 runner = null;
             }
+        }
+    }
+
+
+    final class PeriodicTask implements Runnable,SchedulerRunnableIntrospection{
+        @NotNull
+        @Override
+        public Runnable getWrappedRunnable() {
+            return null;
+        }
+
+        @Override
+        public void run() {
+
+        }
+    }
+
+    final class PeriodicDirectTask implements Runnable,SchedulerRunnableIntrospection,Disposable{
+        @Override
+        public void dispose() {
+
+        }
+
+        @Override
+        public boolean isDisposed() {
+            return false;
+        }
+
+        @NotNull
+        @Override
+        public Runnable getWrappedRunnable() {
+            return null;
+        }
+
+        @Override
+        public void run() {
+
         }
     }
 

@@ -1,7 +1,8 @@
 package com.example.example.rxjava.internal
 
 import com.example.example.rxjava.Scheduler
-import io.reactivex.rxjava3.internal.schedulers.NewThreadWorker
+import com.example.example.rxjava.schedulers.NewThreadWorker
+
 
 class IoScheduler :Scheduler(){
 
@@ -19,7 +20,7 @@ class IoScheduler :Scheduler(){
         }
     }
 
-    class TreadWorker : NewThreadWorker {
+    class TreadWorker : NewThreadWorker() {
 
     }
 
