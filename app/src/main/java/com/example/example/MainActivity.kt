@@ -10,6 +10,7 @@ import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.internal.operators.observable.ObservableObserveOn
 import io.reactivex.rxjava3.internal.operators.observable.ObservableSubscribeOn
 import io.reactivex.rxjava3.schedulers.Schedulers
+import okhttp3.OkHttpClient
 
 class MainActivity : AppCompatActivity() {
 
@@ -38,5 +39,7 @@ class MainActivity : AppCompatActivity() {
             override fun onError(e: Throwable?) {
             }
         })
+
+
     }
 }

@@ -376,6 +376,7 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
         List<Object> mPayloads = null;
         List<Object> mUnmodifiedPayloads = null;
         MyRecyclerView mOwnerRecyclerView;
+        Recycler mScrapContainer = null;
         @VisibleForTesting
         int mPendingAccessibilityState = PENDING_ACCESSIBILITY_STATE_NOT_SET;
         private int mIsRecyclableCount = 0;
@@ -453,6 +454,8 @@ public class MyRecyclerView extends ViewGroup implements NestedScrollingChild2, 
         void unScrap() {
             mScrapContainer.unscrapView(this);
         }
+
+
 
         boolean wasReturnedFromScrap() {
             return (mFlags & FLAG_RETURNED_FROM_SCRAP) != 0;
